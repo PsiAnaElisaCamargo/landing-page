@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Poltrona de escuta — Ana Elisa Camargo</title>
+  <rect width="64" height="64" rx="12" fill="#FBF7F2"/>
+  <g stroke="#714B3E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m17 49-3 9m17-7-1 9m22-12 3 8" fill="none" stroke-width="3"/>
+    <path d="M11 39 7 15c-1-5 2-7 7-8l20-2c5 0 8 2 9 7l4 23-7 14Z" fill="#CF8367"/>
+    <path d="M10 10c5 1 7 5 8 11l2 13" fill="none" stroke-width="2"/>
+    <path d="M39 28c5-5 10-6 15-3 3 2 3 5 2 10l-2 12c-1 4-5 6-10 6l-19-1-5-17Z" fill="#B96F53"/>
+    <path d="m25 33 19-2c5 0 8 2 8 5l-1 7-24 4Z" fill="#DEA184"/>
+    <path d="m29 40 21-2" fill="none" stroke-width="2"/>
+    <path d="M12 26c6-1 12 2 14 7l3 11 20-2c4-1 6 1 5 4-1 4-6 7-12 8l-19-1c-6-1-9-4-10-9l-3-12c-1-3-1-5 2-6Z" fill="#CF8367"/>
+    <path d="m29 44 1 9" fill="none" stroke-width="2"/>
+  </g>
+</svg>

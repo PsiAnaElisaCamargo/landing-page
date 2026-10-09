@@ -1,0 +1,28 @@
+/* One continuous drawing, confined to the original layout's empty margins. */
+body{position:relative}
+.site-header .brand-symbol{transform:scaleX(-1)}
+.story-thread{position:fixed;inset:0;width:100%;height:100%;z-index:6;pointer-events:none;overflow:hidden;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.thread-line,.thread-answer{stroke-width:1.5;stroke-opacity:.53;vector-effect:non-scaling-stroke}
+.thread-traveler{stroke-width:1.8;stroke-opacity:.22;stroke-dasharray:18 900;animation:thread-flow 65s linear infinite;vector-effect:non-scaling-stroke}
+.thought-closing{background:var(--sand);text-align:center;padding:12px 0 64px}
+.thought-drawing{height:200px;max-width:820px;margin:0 auto 28px}
+.thought-closing .eyebrow{margin-bottom:20px}
+.thought-closing h2{max-width:880px;margin-inline:auto;font-size:clamp(36px,4vw,56px);line-height:1.13}
+.thought-description{margin-top:26px;font-size:1.125rem}
+body:has(.main-nav.is-open) .story-thread{visibility:hidden}
+.story-thread.is-paused .thread-traveler{animation-play-state:paused}
+.thread-pause{border:0;border-bottom:1px solid var(--line-strong);background:none;color:var(--muted);font:inherit;font-size:12px;min-height:44px;padding:6px 0;cursor:pointer;text-underline-offset:4px}
+.thread-pause:hover{color:var(--accent);border-color:var(--accent)}
+.thread-pause:disabled{cursor:default}
+.thread-pause[hidden]{display:none}
+@keyframes thread-flow{from{stroke-dashoffset:918}to{stroke-dashoffset:0}}
+@media(max-width:700px){
+  .thread-line,.thread-answer{stroke-width:1.2;stroke-opacity:.43}
+  .thread-traveler{stroke-width:1.5}
+  .thought-closing{padding:8px 0 60px}
+  .thought-drawing{height:160px;margin-bottom:22px}
+  .thought-closing h2{font-size:clamp(34px,8vw,44px)}
+  .thought-description{font-size:1rem;margin-top:22px}
+}
+@media(prefers-reduced-motion:reduce){.thread-traveler{display:none;animation:none}}
+@media print{.story-thread,.thread-pause{display:none!important}.thought-drawing{display:none}.thought-closing{padding:30px 0}}
