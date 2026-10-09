@@ -531,7 +531,7 @@ p{
 }
 .location-grid{
   display:grid;
-  grid-template-columns:1fr 1fr 1fr;
+  grid-template-columns:repeat(2,minmax(0,1fr));
   gap:23px
 }
 .location-card{
@@ -1033,9 +1033,6 @@ p{
   }
   .location-grid{
     grid-template-columns:1fr 1fr
-  }
-  .location-online{
-    grid-column:1/-1
   }
   .section-heading>p{
     max-width:280px;
