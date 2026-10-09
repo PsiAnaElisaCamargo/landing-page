@@ -16,7 +16,6 @@
   let layoutFrame = 0;
   let scrollFrame = 0;
   let segments = [];
-  let loops = [];
   let lane = 0;
   let inside = 0;
   let pageWidth = 0;
@@ -48,7 +47,6 @@
     class: 'thread-answer', stroke: 'url(#thread-ink)', 'clip-path': 'url(#thread-answer-clip)'
   }, canvas);
   const left = element('path', { class: 'thread-line', stroke: 'url(#thread-ink)', 'clip-path': 'url(#thread-answer-clip)' }, canvas);
-  const loopGroup = element('g', { 'clip-path': 'url(#thread-answer-clip)' }, canvas);
   const traveler = element('path', { class: 'thread-traveler', stroke: 'url(#thread-ink)', 'clip-path': 'url(#thread-answer-clip)' }, canvas);
   const origin = element('path', { class: 'thread-line', stroke: '#a85f43' }, canvas);
   const edgeGradient = element('linearGradient', {
@@ -89,11 +87,6 @@
     });
     const drop = Math.max(220, Math.min(460, window.innerHeight * .55));
     const joinY = Math.min(headerBottom + drop, closingTop);
-    loops.forEach(({ node, top }) => {
-      // Ease each flourish away before the sticky connection reaches it.
-      const progress = Math.max(0, Math.min(1, (top - joinY) / 100));
-      node.style.opacity = progress * progress * (3 - 2 * progress);
-    });
     const index = segments.findIndex(part => joinY <= part.y3);
     const segmentIndex = index < 0 ? segments.length - 1 : index;
     const part = segments[segmentIndex];
@@ -193,26 +186,6 @@
         b.x - b.slope * height / 3, b.x, startY + length * t1);
     }
 
-    loopGroup.replaceChildren();
-    loops = [];
-    // Sparse, tilted flourishes touch the wave at its outer turning points.
-    // Scale to the empty gutter; omit them where mobile margins are too narrow.
-    if (span >= 36) {
-      for (let index = 0; index < waveCount; index++) {
-        const t = (index + .25) / waveCount;
-        const anchor = wave(t);
-        const baseY = startY + length * t;
-        const width = Math.min(inside - anchor.x - 4, span * (index % 2 ? .64 : .82));
-        const height = index % 2 ? 104 : 148;
-        const tipX = anchor.x + width;
-        const d = `M${point(anchor.x, baseY)}`
-          + curve(anchor.x, baseY + height * .40, tipX, baseY - height * .28, tipX, baseY - height * .67)
-          + curve(tipX, baseY - height * 1.12, anchor.x, baseY - height * .34, anchor.x, baseY);
-        const node = element('path', { class: 'thread-line', stroke: 'url(#thread-ink)', d }, loopGroup);
-        loops.push({ node, top: baseY - height });
-      }
-    }
-
     const artBox = drawing.getBoundingClientRect();
     const artTop = docTop(drawing);
     const center = pageWidth / 2;
@@ -220,8 +193,9 @@
     const x = fraction => center - artWidth / 2 + fraction * artWidth;
     const y = fraction => artTop + fraction * artBox.height;
     endingBottom = y(.94);
+    // Drop along the margin before sweeping gently into the closing drawing.
+    ending = curve(lane, y(.50), lane + (x(.22) - lane) * .25, y(.64), x(.22), y(.64));
     // Loose knots gradually open into a quiet final stem above the copy.
-    ending = curve(lane, closingTop + 110, x(.03), y(.64), x(.22), y(.64));
     ending += curve(x(.39), y(.64), x(.29), y(.01), x(.22), y(.25));
     ending += curve(x(.13), y(.61), x(.43), y(.86), x(.48), y(.55));
     ending += curve(x(.58), y(.05), x(.37), y(.08), x(.41), y(.48));
@@ -293,12 +267,11 @@
   }
   function updatePlayback() {
     canvas.classList.toggle('is-paused', paused || reducedMotion.matches || document.hidden);
-    pauseButton.disabled = reducedMotion.matches;
+    pauseButton.hidden = reducedMotion.matches;
     pauseButton.setAttribute('aria-pressed', String(paused));
-    pauseButton.textContent = reducedMotion.matches ? 'Movimento reduzido' : paused ? 'Retomar animação do fundo' : 'Pausar animação do fundo';
+    pauseButton.textContent = paused ? 'Retomar animação do fundo' : 'Pausar animação do fundo';
   }
 
-  pauseButton.hidden = false;
   pauseButton.addEventListener('click', () => { paused = !paused; updatePlayback(); });
   reducedMotion.addEventListener('change', updatePlayback);
   document.addEventListener('visibilitychange', updatePlayback);

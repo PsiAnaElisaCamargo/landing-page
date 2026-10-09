@@ -737,6 +737,7 @@ p{
 }
 .footer-social a,
 .nav-links>a,
+.developer-credit a,
 .footer-bottom>a{
   background-image:linear-gradient(currentColor,currentColor);
   background-repeat:no-repeat;
@@ -748,6 +749,8 @@ p{
 .footer-social a:focus-visible,
 .nav-links>a:hover,
 .nav-links>a:focus-visible,
+.developer-credit a:hover,
+.developer-credit a:focus-visible,
 .footer-bottom>a:hover,
 .footer-bottom>a:focus-visible{
   background-size:100% 1px;
@@ -783,8 +786,8 @@ p{
 .footer-bottom>a{
   text-decoration:none
 }
-.developer-credit strong{
-  font-weight:600;
+.developer-credit a{
+  text-decoration:none;
   color:var(--ink)
 }
 @media(min-width:1400px){
