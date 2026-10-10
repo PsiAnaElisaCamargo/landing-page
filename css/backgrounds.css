@@ -16,7 +16,7 @@ body:has(.main-nav.is-open) .story-thread{visibility:hidden}
 @media(max-width:700px){
   .story-thread:not(.story-thread--closing),.thread-answer{display:none}
   .thread-line,.thread-answer{stroke-width:1.6;stroke-opacity:.62}
-  /* JS sizes each cycle to its local path: navbar or section crossing. */
+  /* JS sizes each cycle to its local path: navbar, descent or crossing. */
   .thread-traveler{stroke-width:2.4;stroke-opacity:.9}
   .thought-closing{padding:8px 0 60px}
   .thought-drawing{height:clamp(196px,52vw,220px);margin-bottom:26px}

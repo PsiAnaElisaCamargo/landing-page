@@ -69,19 +69,19 @@
   const closingRight = element('path', { class: 'thread-answer', stroke: 'url(#thread-closing-ink)' }, closingCanvas);
   const closingLeft = element('path', { class: 'thread-line', stroke: 'url(#thread-closing-ink)' }, closingCanvas);
   const closingTraveler = element('path', { class: 'thread-traveler', stroke: 'url(#thread-closing-ink)' }, closingCanvas);
-  const crossingTravelers = [];
+  const sectionTravelers = [];
   const travelerObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
     entries.forEach(entry => entry.target.classList.toggle('is-offscreen', !entry.isIntersecting));
   }, { rootMargin: '80px' }) : null;
   travelerObserver?.observe(closingTraveler);
 
-  function setMobileTraveler(path, d, delay) {
+  function setMobileTraveler(path, d, delay, count = 2) {
     path.setAttribute('d', d);
-    // Two evenly spaced highlights per local path, near its start and middle.
-    const cycle = (Math.ceil(path.getTotalLength()) + 56) / 2;
+    // Space highlights evenly within each local path.
+    const cycle = (Math.ceil(path.getTotalLength()) + 56) / count;
     path.style.setProperty('--thread-cycle', cycle);
     path.style.strokeDasharray = `56 ${cycle - 56}`;
-    path.style.animationDuration = `${cycle / 60}s`;
+    path.style.animationDuration = `${cycle / 90}s`;
     path.style.animationDelay = `${delay}s`;
   }
 
@@ -95,7 +95,7 @@
 
   function mobileRoute(startY) {
     const center = pageWidth / 2;
-    const crossings = [];
+    const highlights = [];
     let originD = '';
     let side = lane;
     let lastY = startY;
@@ -103,8 +103,13 @@
     const followMargin = bottom => {
       const height = bottom - lastY;
       const bend = side < center ? 3 : -3;
-      d += curve(side + bend, lastY + height / 3,
+      const margin = curve(side + bend, lastY + height / 3,
         side - bend, lastY + height * 2 / 3, side, bottom);
+      // The navbar already has its own traveler; animate later descents too.
+      if (originD && height > 0) {
+        highlights.push({ d: `M${point(side, lastY)}` + margin, count: 2 });
+      }
+      d += margin;
       lastY = bottom;
     };
 
@@ -166,12 +171,12 @@
       const exitBottom = boundary + after;
       d += curve(exit.x + direction * exitSpan * .45, exit.y,
         opposite, exitBottom - (exitBottom - exit.y) * .65, opposite, exitBottom);
-      crossings.push(crossingMove + d.slice(crossingStart));
+      highlights.push({ d: crossingMove + d.slice(crossingStart), count: 2 });
       side = opposite;
       lastY = boundary + after;
     });
     followMargin(closingTop);
-    return { d, side, originD: originD || d, crossings };
+    return { d, side, originD: originD || d, highlights };
   }
 
   function mobileEnding(endingLane, x, y, center) {
@@ -388,22 +393,22 @@
     closingLeft.setAttribute('d', ending);
     if (route) {
       setMobileTraveler(closingTraveler, route.originD, -1);
-      route.crossings.forEach((d, index) => {
-        if (!crossingTravelers[index]) {
-          crossingTravelers[index] = element('path', {
+      route.highlights.forEach(({ d, count }, index) => {
+        if (!sectionTravelers[index]) {
+          sectionTravelers[index] = element('path', {
             class: 'thread-traveler is-offscreen', stroke: 'url(#thread-closing-ink)'
           }, closingCanvas);
-          if (travelerObserver) travelerObserver.observe(crossingTravelers[index]);
-          else crossingTravelers[index].classList.remove('is-offscreen');
+          if (travelerObserver) travelerObserver.observe(sectionTravelers[index]);
+          else sectionTravelers[index].classList.remove('is-offscreen');
         }
-        setMobileTraveler(crossingTravelers[index], d, -1);
+        setMobileTraveler(sectionTravelers[index], d, -1, count);
       });
     } else {
       closingTraveler.removeAttribute('style');
       closingTraveler.setAttribute('d', ending);
     }
-    while (crossingTravelers.length > (route?.crossings.length || 0)) {
-      const path = crossingTravelers.pop();
+    while (sectionTravelers.length > (route?.highlights.length || 0)) {
+      const path = sectionTravelers.pop();
       travelerObserver?.unobserve(path);
       path.remove();
     }
