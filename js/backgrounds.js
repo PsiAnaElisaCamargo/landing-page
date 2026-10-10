@@ -14,7 +14,8 @@
   let layoutFrame = 0;
   let scrollFrame = 0;
   let scrollIdleTimer = 0;
-  let mobileScrolling = false;
+  let scrolling = false;
+  let touching = false;
   let segments = [];
   let lane = 0;
   let inside = 0;
@@ -68,6 +69,21 @@
   const closingRight = element('path', { class: 'thread-answer', stroke: 'url(#thread-closing-ink)' }, closingCanvas);
   const closingLeft = element('path', { class: 'thread-line', stroke: 'url(#thread-closing-ink)' }, closingCanvas);
   const closingTraveler = element('path', { class: 'thread-traveler', stroke: 'url(#thread-closing-ink)' }, closingCanvas);
+  const crossingTravelers = [];
+  const travelerObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+    entries.forEach(entry => entry.target.classList.toggle('is-offscreen', !entry.isIntersecting));
+  }, { rootMargin: '80px' }) : null;
+  travelerObserver?.observe(closingTraveler);
+
+  function setMobileTraveler(path, d, delay) {
+    path.setAttribute('d', d);
+    // Two evenly spaced highlights per local path, near its start and middle.
+    const cycle = (Math.ceil(path.getTotalLength()) + 56) / 2;
+    path.style.setProperty('--thread-cycle', cycle);
+    path.style.strokeDasharray = `56 ${cycle - 56}`;
+    path.style.animationDuration = `${cycle / 60}s`;
+    path.style.animationDelay = `${delay}s`;
+  }
 
   const docTop = node => node.getBoundingClientRect().top + window.scrollY;
   const point = (x, y) => `${x.toFixed(2)} ${y.toFixed(2)}`;
@@ -79,6 +95,8 @@
 
   function mobileRoute(startY) {
     const center = pageWidth / 2;
+    const crossings = [];
+    let originD = '';
     let side = lane;
     let lastY = startY;
     let d = `M${point(side, startY)}`;
@@ -102,6 +120,9 @@
       const x = offset => center + direction * offset;
       const opposite = pageWidth - side;
       followMargin(boundary - before);
+      if (!originD) originD = d;
+      const crossingStart = d.length;
+      const crossingMove = `M${point(side, boundary - before)}`;
 
       // Repeat the same tangle, mirrored toward the destination margin by x().
       // Shared derivatives keep the entry, turns and exit smoothly connected.
@@ -145,11 +166,12 @@
       const exitBottom = boundary + after;
       d += curve(exit.x + direction * exitSpan * .45, exit.y,
         opposite, exitBottom - (exitBottom - exit.y) * .65, opposite, exitBottom);
+      crossings.push(crossingMove + d.slice(crossingStart));
       side = opposite;
       lastY = boundary + after;
     });
     followMargin(closingTop);
-    return { d, side };
+    return { d, side, originD: originD || d, crossings };
   }
 
   function mobileEnding(endingLane, x, y, center) {
@@ -364,7 +386,27 @@
     closingRight.setAttribute('d', `M${point(rightLane, lastY)}`
       + curve(rightLane, closingTop + 115, x(.70), y(-.10), x(.46), y(.16)));
     closingLeft.setAttribute('d', ending);
-    closingTraveler.setAttribute('d', ending);
+    if (route) {
+      setMobileTraveler(closingTraveler, route.originD, -1);
+      route.crossings.forEach((d, index) => {
+        if (!crossingTravelers[index]) {
+          crossingTravelers[index] = element('path', {
+            class: 'thread-traveler is-offscreen', stroke: 'url(#thread-closing-ink)'
+          }, closingCanvas);
+          if (travelerObserver) travelerObserver.observe(crossingTravelers[index]);
+          else crossingTravelers[index].classList.remove('is-offscreen');
+        }
+        setMobileTraveler(crossingTravelers[index], d, -1);
+      });
+    } else {
+      closingTraveler.removeAttribute('style');
+      closingTraveler.setAttribute('d', ending);
+    }
+    while (crossingTravelers.length > (route?.crossings.length || 0)) {
+      const path = crossingTravelers.pop();
+      travelerObserver?.unobserve(path);
+      path.remove();
+    }
 
     const contact = document.querySelector('.contact');
     const contactStart = docTop(contact);
@@ -396,12 +438,36 @@
   }
   function updatePlayback() {
     [canvas, closingCanvas].forEach(node => {
-      node.classList.toggle('is-paused', reducedMotion.matches || document.hidden || mobileScrolling);
+      node.classList.toggle('is-paused', reducedMotion.matches || document.hidden || scrolling || touching);
     });
+  }
+
+  function pauseForScroll() {
+    clearTimeout(scrollIdleTimer);
+    if (!scrolling) {
+      scrolling = true;
+      updatePlayback();
+    }
+    // Keep the pause through slow gestures and the end of momentum scrolling.
+    scrollIdleTimer = setTimeout(() => {
+      scrolling = false;
+      updatePlayback();
+    }, 450);
+  }
+
+  function updateTouch(event) {
+    touching = event.touches.length > 0;
+    pauseForScroll();
+    updatePlayback();
   }
 
   reducedMotion.addEventListener('change', updatePlayback);
   document.addEventListener('visibilitychange', updatePlayback);
+  // Pause before the first scroll event, and never resume under a held finger.
+  ['touchstart', 'touchend', 'touchcancel'].forEach(type => {
+    window.addEventListener(type, updateTouch, { passive: true });
+  });
+  window.addEventListener('wheel', pauseForScroll, { passive: true });
   window.addEventListener('resize', () => {
     // Browser chrome changes height while scrolling; the mobile route only
     // needs rebuilding for width or content changes (observed below).
@@ -409,20 +475,9 @@
     scheduleDraw();
   }, { passive: true });
   window.addEventListener('scroll', () => {
-    if (pageWidth <= 700) {
-      // Stop SVG dash repaints during touch/momentum scrolling and resume
-      // from the same position once the page settles.
-      if (!mobileScrolling) {
-        mobileScrolling = true;
-        updatePlayback();
-      }
-      clearTimeout(scrollIdleTimer);
-      scrollIdleTimer = setTimeout(() => {
-        mobileScrolling = false;
-        updatePlayback();
-      }, 180);
-      return;
-    }
+    // Pause at every viewport width, including landscape phones and tablets.
+    pauseForScroll();
+    if (pageWidth <= 700) return;
     if (!scrollFrame) scrollFrame = requestAnimationFrame(render);
   }, { passive: true });
   if ('ResizeObserver' in window) {

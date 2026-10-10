@@ -11,13 +11,13 @@ body{position:relative}
 .thought-closing h2{max-width:880px;margin-inline:auto;font-size:clamp(36px,4vw,56px);line-height:1.13}
 .thought-description{margin-top:26px;font-size:1.125rem}
 body:has(.main-nav.is-open) .story-thread{visibility:hidden}
-.story-thread.is-paused .thread-traveler{animation-play-state:paused}
+.story-thread.is-paused .thread-traveler,.thread-traveler.is-offscreen{animation-play-state:paused}
 @keyframes thread-flow{from{stroke-dashoffset:var(--thread-cycle)}to{stroke-dashoffset:0}}
 @media(max-width:700px){
   .story-thread:not(.story-thread--closing),.thread-answer{display:none}
   .thread-line,.thread-answer{stroke-width:1.6;stroke-opacity:.62}
-  /* Sparse, shorter highlights keep the thread's motion quiet on phones. */
-  .thread-traveler{--thread-cycle:1080;stroke-width:2.4;stroke-opacity:.9;stroke-dasharray:64 1016;animation-duration:32s}
+  /* JS sizes each cycle to its local path: navbar or section crossing. */
+  .thread-traveler{stroke-width:2.4;stroke-opacity:.9}
   .thought-closing{padding:8px 0 60px}
   .thought-drawing{height:clamp(196px,52vw,220px);margin-bottom:26px}
   .thought-closing h2{font-size:clamp(34px,8vw,44px)}
