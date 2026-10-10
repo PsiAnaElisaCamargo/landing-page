@@ -6,13 +6,11 @@
   const symbol = header?.querySelector('.brand-symbol');
   const closing = document.querySelector('.thought-closing');
   const drawing = closing?.querySelector('.thought-drawing');
-  const pauseButton = document.querySelector('.thread-pause');
-  if (!main || !symbol || !drawing || !pauseButton) return;
+  if (!main || !symbol || !drawing) return;
 
   const ns = 'http://www.w3.org/2000/svg';
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const sections = [...main.querySelectorAll(':scope > section')];
-  let paused = false;
   let layoutFrame = 0;
   let scrollFrame = 0;
   let segments = [];
@@ -266,13 +264,9 @@
     if (!layoutFrame) layoutFrame = requestAnimationFrame(draw);
   }
   function updatePlayback() {
-    canvas.classList.toggle('is-paused', paused || reducedMotion.matches || document.hidden);
-    pauseButton.hidden = reducedMotion.matches;
-    pauseButton.setAttribute('aria-pressed', String(paused));
-    pauseButton.textContent = paused ? 'Retomar animação do fundo' : 'Pausar animação do fundo';
+    canvas.classList.toggle('is-paused', reducedMotion.matches || document.hidden);
   }
 
-  pauseButton.addEventListener('click', () => { paused = !paused; updatePlayback(); });
   reducedMotion.addEventListener('change', updatePlayback);
   document.addEventListener('visibilitychange', updatePlayback);
   window.addEventListener('resize', scheduleDraw, { passive: true });

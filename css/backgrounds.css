@@ -11,10 +11,6 @@ body{position:relative}
 .thought-description{margin-top:26px;font-size:1.125rem}
 body:has(.main-nav.is-open) .story-thread{visibility:hidden}
 .story-thread.is-paused .thread-traveler{animation-play-state:paused}
-.thread-pause{border:0;border-bottom:1px solid var(--line-strong);background:none;color:var(--muted);font:inherit;font-size:12px;min-height:44px;padding:6px 0;cursor:pointer;text-underline-offset:4px}
-.thread-pause:hover{color:var(--accent);border-color:var(--accent)}
-.thread-pause:disabled{cursor:default}
-.thread-pause[hidden]{display:none}
 @keyframes thread-flow{from{stroke-dashoffset:918}to{stroke-dashoffset:0}}
 @media(max-width:700px){
   .thread-line,.thread-answer{stroke-width:1.2;stroke-opacity:.43}
@@ -25,4 +21,4 @@ body:has(.main-nav.is-open) .story-thread{visibility:hidden}
   .thought-description{font-size:1rem;margin-top:22px}
 }
 @media(prefers-reduced-motion:reduce){.thread-traveler{display:none;animation:none}}
-@media print{.story-thread,.thread-pause{display:none!important}.thought-drawing{display:none}.thought-closing{padding:30px 0}}
+@media print{.story-thread{display:none!important}.thought-drawing{display:none}.thought-closing{padding:30px 0}}
