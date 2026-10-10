@@ -2,8 +2,9 @@
 body{position:relative}
 .site-header .brand-symbol{transform:scaleX(-1)}
 .story-thread{position:fixed;inset:0;width:100%;height:100%;z-index:6;pointer-events:none;overflow:hidden;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.story-thread--closing{position:absolute;inset:auto 0 auto;z-index:4}
 .thread-line,.thread-answer{stroke-width:1.5;stroke-opacity:.53;vector-effect:non-scaling-stroke}
-.thread-traveler{stroke-width:1.8;stroke-opacity:.22;stroke-dasharray:18 900;animation:thread-flow 65s linear infinite;vector-effect:non-scaling-stroke}
+.thread-traveler{--thread-cycle:918;stroke-width:1.8;stroke-opacity:.22;stroke-dasharray:18 900;animation:thread-flow 65s linear infinite;vector-effect:non-scaling-stroke}
 .thought-closing{background:var(--sand);text-align:center;padding:12px 0 64px}
 .thought-drawing{height:200px;max-width:820px;margin:0 auto 28px}
 .thought-closing .eyebrow{margin-bottom:20px}
@@ -11,12 +12,14 @@ body{position:relative}
 .thought-description{margin-top:26px;font-size:1.125rem}
 body:has(.main-nav.is-open) .story-thread{visibility:hidden}
 .story-thread.is-paused .thread-traveler{animation-play-state:paused}
-@keyframes thread-flow{from{stroke-dashoffset:918}to{stroke-dashoffset:0}}
+@keyframes thread-flow{from{stroke-dashoffset:var(--thread-cycle)}to{stroke-dashoffset:0}}
 @media(max-width:700px){
-  .thread-line,.thread-answer{stroke-width:1.2;stroke-opacity:.43}
-  .thread-traveler{stroke-width:1.5}
+  .story-thread:not(.story-thread--closing),.thread-answer{display:none}
+  .thread-line,.thread-answer{stroke-width:1.6;stroke-opacity:.62}
+  /* A full dash cycle fits within a phone viewport, keeping motion in sight. */
+  .thread-traveler{--thread-cycle:360;stroke-width:2.4;stroke-opacity:.9;stroke-dasharray:84 276;animation-duration:9s}
   .thought-closing{padding:8px 0 60px}
-  .thought-drawing{height:160px;margin-bottom:22px}
+  .thought-drawing{height:clamp(196px,52vw,220px);margin-bottom:26px}
   .thought-closing h2{font-size:clamp(34px,8vw,44px)}
   .thought-description{font-size:1rem;margin-top:22px}
 }

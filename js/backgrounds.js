@@ -18,8 +18,6 @@
   let inside = 0;
   let pageWidth = 0;
   let closingTop = 0;
-  let ending = '';
-  let endingBottom = 0;
 
   function element(tag, attributes, parent) {
     const node = document.createElementNS(ns, tag);
@@ -28,8 +26,7 @@
     return node;
   }
 
-  // A single fixed SVG paints the sticky origin and scrolling continuation
-  // in the same frame, so native scrolling cannot pull them apart.
+  // The fixed layer keeps the thread attached to the sticky brand symbol.
   const canvas = element('svg', {
     class: 'story-thread', 'aria-hidden': 'true', focusable: 'false',
     preserveAspectRatio: 'none'
@@ -56,6 +53,20 @@
   const edgeRect = element('rect', { x: 0, fill: 'url(#thread-edge-fade)' }, edgeMask);
   [left, right, traveler].forEach(path => path.setAttribute('mask', 'url(#thread-edge-mask)'));
 
+  // The closing artwork scrolls with the document, without waiting for JS.
+  const closingCanvas = element('svg', {
+    class: 'story-thread story-thread--closing', 'aria-hidden': 'true',
+    focusable: 'false', preserveAspectRatio: 'none'
+  }, document.body);
+  const closingDefs = element('defs', {}, closingCanvas);
+  const closingGradient = element('linearGradient', {
+    id: 'thread-closing-ink', gradientUnits: 'userSpaceOnUse', x1: 0, x2: 0, y1: 0
+  }, closingDefs);
+  const closingStops = Array.from({ length: 4 }, () => element('stop', {}, closingGradient));
+  const closingRight = element('path', { class: 'thread-answer', stroke: 'url(#thread-closing-ink)' }, closingCanvas);
+  const closingLeft = element('path', { class: 'thread-line', stroke: 'url(#thread-closing-ink)' }, closingCanvas);
+  const closingTraveler = element('path', { class: 'thread-traveler', stroke: 'url(#thread-closing-ink)' }, closingCanvas);
+
   const docTop = node => node.getBoundingClientRect().top + window.scrollY;
   const point = (x, y) => `${x.toFixed(2)} ${y.toFixed(2)}`;
   const curve = (x1, y1, x2, y2, x3, y3) => `C${point(x1, y1)} ${point(x2, y2)} ${point(x3, y3)}`;
@@ -64,8 +75,100 @@
     segments.push({ x0, y0, x1, x2, x3, y3 });
   }
 
+  function mobileRoute(startY) {
+    const center = pageWidth / 2;
+    let side = lane;
+    let lastY = startY;
+    let d = `M${point(side, startY)}`;
+    const followMargin = bottom => {
+      const height = bottom - lastY;
+      const bend = side < center ? 3 : -3;
+      d += curve(side + bend, lastY + height / 3,
+        side - bend, lastY + height * 2 / 3, side, bottom);
+      lastY = bottom;
+    };
+
+    sections.slice(1).filter(section => section !== closing).forEach((section, index) => {
+      const previous = sections[index];
+      const boundary = docTop(section);
+      // Cross only inside section padding, leaving space around the content.
+      const before = Math.min(56, parseFloat(getComputedStyle(previous).paddingBottom) - 12);
+      const after = Math.min(56, parseFloat(getComputedStyle(section).paddingTop) - 12);
+      const middle = boundary + (after - before) / 2;
+      const radius = Math.min(25, (before + after) / 3.6);
+      const direction = side < center ? 1 : -1;
+      const x = offset => center + direction * offset;
+      const opposite = pageWidth - side;
+      followMargin(boundary - before);
+
+      // Repeat the same tangle, mirrored toward the destination margin by x().
+      // Shared derivatives keep the entry, turns and exit smoothly connected.
+      const turns = 3;
+      const omega = Math.PI * 2 * turns;
+      const tilt = -8;
+      const spread = 32;
+      const baseRadius = 26;
+      const swelling = 5;
+      const knot = t => {
+        const envelope = Math.sin(Math.PI * t) ** 2;
+        const envelopeSlope = Math.PI * Math.sin(Math.PI * 2 * t);
+        const rx = baseRadius + swelling * envelope;
+        const ry = radius * (.88 + .12 * envelope);
+        const sine = Math.sin(omega * t);
+        const cosine = Math.cos(omega * t);
+        return {
+          x: x(spread * (t - .5) + rx * sine + tilt * cosine),
+          y: middle + ry * cosine - radius * .65,
+          dx: direction * (spread + swelling * envelopeSlope * sine + rx * omega * cosine - tilt * omega * sine),
+          dy: radius * .12 * envelopeSlope * cosine - ry * omega * sine
+        };
+      };
+      const entry = knot(0);
+      const entrySpan = Math.abs(entry.x - side);
+      // Start bending early along the margin, then ease into the loop.
+      // Unequal handles create a broad arc instead of a flat horizontal bridge.
+      const entryTop = boundary - before;
+      d += curve(side, entryTop + (entry.y - entryTop) * .65,
+        entry.x - direction * entrySpan * .45, entry.y, entry.x, entry.y);
+      const steps = turns * 16;
+      for (let step = 0; step < steps; step++) {
+        const a = knot(step / steps);
+        const b = knot((step + 1) / steps);
+        const handle = 1 / (steps * 3);
+        d += curve(a.x + a.dx * handle, a.y + a.dy * handle,
+          b.x - b.dx * handle, b.y - b.dy * handle, b.x, b.y);
+      }
+      const exit = knot(1);
+      const exitSpan = Math.abs(opposite - exit.x);
+      const exitBottom = boundary + after;
+      d += curve(exit.x + direction * exitSpan * .45, exit.y,
+        opposite, exitBottom - (exitBottom - exit.y) * .65, opposite, exitBottom);
+      side = opposite;
+      lastY = boundary + after;
+    });
+    followMargin(closingTop);
+    return { d, side };
+  }
+
+  function mobileEnding(endingLane, x, y, center) {
+    // One open sweep, a wider central tangle, then a separate right-hand loop.
+    let d = curve(endingLane, y(.34), x(.22), y(.67), x(.44), y(.54));
+    d += curve(x(.66), y(.40), x(.57), y(.03), x(.41), y(.19));
+    d += curve(x(.24), y(.36), x(.45), y(.79), x(.59), y(.54));
+    d += curve(x(.72), y(.30), x(.41), y(.05), x(.36), y(.31));
+    d += curve(x(.31), y(.60), x(.65), y(.75), x(.62), y(.40));
+    d += curve(x(.59), y(.07), x(.32), y(.18), x(.40), y(.49));
+    d += curve(x(.46), y(.77), x(.72), y(.63), x(.81), y(.43));
+    d += curve(x(.91), y(.18), x(.71), y(.25), x(.75), y(.48));
+    d += curve(x(.79), y(.66), x(.92), y(.61), x(.74), y(.72));
+    d += curve(x(.62), y(.80), center, y(.79), center, y(.94));
+    return d;
+  }
+
   function render() {
     scrollFrame = 0;
+    // Mobile uses one document-anchored path; scrolling never rebuilds its knots.
+    if (pageWidth <= 700) return;
     if (!segments.length) return;
     const scrollY = window.scrollY;
     const headerBox = header.getBoundingClientRect();
@@ -138,7 +241,6 @@
       origin.setAttribute('d', `M${point(startX, startY)}`
         + curve(Math.max(3, startX - 70), startY + 5, lane, startY + 14, lane, headerBottom));
     }
-    if (endingBottom > headerBottom) d += ending;
     canvas.setAttribute('viewBox', `0 ${scrollY} ${pageWidth} ${window.innerHeight}`);
     left.setAttribute('d', d);
     traveler.setAttribute('d', d);
@@ -151,8 +253,9 @@
     layoutFrame = 0;
     pageWidth = document.documentElement.clientWidth;
     const startY = docTop(main);
-    // Start turning before the color boundary instead of bending at its edge.
-    closingTop = docTop(closing) - Math.min(160, window.innerHeight * .18);
+    // Keep the turn stable when mobile browser chrome changes viewport height.
+    const artBox = drawing.getBoundingClientRect();
+    closingTop = docTop(closing) - Math.min(160, artBox.height * .8);
     const containers = [...main.querySelectorAll('.container')];
     const gutter = Math.max(12, Math.min(...containers.map(node => node.getBoundingClientRect().left)) - 7);
     const outside = Math.max(3, Math.min(18, gutter * .12));
@@ -163,7 +266,9 @@
     // Sample a flowing wave with shared derivatives instead of stopping at
     // every extremum and restarting a new S-curve at each section boundary.
     const length = closingTop - startY;
-    const waveCount = Math.max(1, Math.round(length / 1400));
+    // Shorter mobile waves reveal the curve within one screen of scrolling.
+    const waveLength = pageWidth <= 700 ? 640 : 1400;
+    const waveCount = Math.max(1, Math.round(length / waveLength));
     const steps = waveCount * 16;
     const omega = Math.PI * 2 * waveCount;
     const wave = t => {
@@ -184,29 +289,33 @@
         b.x - b.slope * height / 3, b.x, startY + length * t1);
     }
 
-    const artBox = drawing.getBoundingClientRect();
     const artTop = docTop(drawing);
     const center = pageWidth / 2;
-    const artWidth = Math.min(760, artBox.width);
-    const x = fraction => center - artWidth / 2 + fraction * artWidth;
+    const route = pageWidth <= 700 ? mobileRoute(startY) : null;
+    const artWidth = Math.min(route ? 420 : 760, artBox.width);
+    const endingLane = route ? route.side : lane;
+    const direction = endingLane < center ? 1 : -1;
+    const x = fraction => center + (fraction - .5) * artWidth * direction;
     const y = fraction => artTop + fraction * artBox.height;
-    endingBottom = y(.94);
     // Drop along the margin before sweeping gently into the closing drawing.
-    ending = curve(lane, y(.50), lane + (x(.22) - lane) * .25, y(.64), x(.22), y(.64));
-    // Loose knots gradually open into a quiet final stem above the copy.
-    ending += curve(x(.39), y(.64), x(.29), y(.01), x(.22), y(.25));
-    ending += curve(x(.13), y(.61), x(.43), y(.86), x(.48), y(.55));
-    ending += curve(x(.58), y(.05), x(.37), y(.08), x(.41), y(.48));
-    ending += curve(x(.46), y(.85), x(.62), y(.48), x(.53), y(.21));
-    ending += curve(x(.43), y(-.01), x(.37), y(.47), x(.49), y(.64));
-    ending += curve(x(.64), y(.81), x(.58), y(.03), x(.46), y(.16));
-    ending += curve(x(.34), y(.29), x(.48), y(.81), x(.57), y(.51));
-    ending += curve(x(.65), y(.22), x(.43), y(.08), x(.44), y(.39));
-    ending += curve(x(.45), y(.62), x(.54), y(.55), x(.52), y(.35));
-    ending += curve(x(.50), y(.18), x(.37), y(.35), x(.43), y(.56));
-    ending += curve(x(.51), y(.86), x(.72), y(.64), x(.71), y(.41));
-    ending += curve(x(.7), y(.22), x(.6), y(.43), x(.67), y(.58));
-    ending += curve(x(.78), y(.79), center, y(.68), center, y(.94));
+    let ending = route ? route.d + mobileEnding(endingLane, x, y, center) : `M${point(lane, closingTop)}`;
+    if (!route) {
+      ending += curve(endingLane, y(.50), endingLane + (x(.22) - endingLane) * .25, y(.64), x(.22), y(.64));
+      // Loose knots gradually open into a quiet final stem above the copy.
+      ending += curve(x(.39), y(.64), x(.29), y(.01), x(.22), y(.25));
+      ending += curve(x(.13), y(.61), x(.43), y(.86), x(.48), y(.55));
+      ending += curve(x(.58), y(.05), x(.37), y(.08), x(.41), y(.48));
+      ending += curve(x(.46), y(.85), x(.62), y(.48), x(.53), y(.21));
+      ending += curve(x(.43), y(-.01), x(.37), y(.47), x(.49), y(.64));
+      ending += curve(x(.64), y(.81), x(.58), y(.03), x(.46), y(.16));
+      ending += curve(x(.34), y(.29), x(.48), y(.81), x(.57), y(.51));
+      ending += curve(x(.65), y(.22), x(.43), y(.08), x(.44), y(.39));
+      ending += curve(x(.45), y(.62), x(.54), y(.55), x(.52), y(.35));
+      ending += curve(x(.50), y(.18), x(.37), y(.35), x(.43), y(.56));
+      ending += curve(x(.51), y(.86), x(.72), y(.64), x(.71), y(.41));
+      ending += curve(x(.7), y(.22), x(.6), y(.43), x(.67), y(.58));
+      ending += curve(x(.78), y(.79), center, y(.68), center, y(.94));
+    }
 
     const rightLane = pageWidth - lane;
     let answer = `M${point(rightLane, startY + 60)}`;
@@ -239,14 +348,22 @@
     });
     // One unbroken arc arrives at the upper knot, with no horizontal join
     // above the small loop. Its last handle matches the knot's tangent.
-    answer += curve(rightLane, closingTop + 115, x(.70), y(-.10), x(.46), y(.16));
     right.setAttribute('d', answer);
+    closingRight.setAttribute('d', `M${point(rightLane, lastY)}`
+      + curve(rightLane, closingTop + 115, x(.70), y(-.10), x(.46), y(.16)));
+    closingLeft.setAttribute('d', ending);
+    closingTraveler.setAttribute('d', ending);
 
     const contact = document.querySelector('.contact');
     const contactStart = docTop(contact);
     const contactEnd = contactStart + contact.getBoundingClientRect().height;
     const endY = docTop(closing) + closing.getBoundingClientRect().height;
     gradient.setAttribute('y2', endY);
+    closingGradient.setAttribute('y2', endY);
+    const canvasTop = route ? startY : closingTop;
+    closingCanvas.setAttribute('viewBox', `0 ${canvasTop} ${pageWidth} ${endY - canvasTop}`);
+    closingCanvas.style.top = `${canvasTop - docTop(document.body)}px`;
+    closingCanvas.style.height = `${endY - canvasTop}px`;
     const stops = [
       [(contactStart - 24) / endY, '#a85f43'],
       [(contactStart + 24) / endY, '#edb69a'],
@@ -254,8 +371,10 @@
       [(contactEnd + 24) / endY, '#a85f43']
     ];
     colorStops.forEach((stop, index) => {
-      stop.setAttribute('offset', Math.max(0, Math.min(1, stops[index][0])));
-      stop.setAttribute('stop-color', stops[index][1]);
+      [stop, closingStops[index]].forEach(node => {
+        node.setAttribute('offset', Math.max(0, Math.min(1, stops[index][0])));
+        node.setAttribute('stop-color', stops[index][1]);
+      });
     });
     render();
   }
@@ -264,7 +383,9 @@
     if (!layoutFrame) layoutFrame = requestAnimationFrame(draw);
   }
   function updatePlayback() {
-    canvas.classList.toggle('is-paused', reducedMotion.matches || document.hidden);
+    [canvas, closingCanvas].forEach(node => {
+      node.classList.toggle('is-paused', reducedMotion.matches || document.hidden);
+    });
   }
 
   reducedMotion.addEventListener('change', updatePlayback);
