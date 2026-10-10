@@ -13,6 +13,8 @@
   const sections = [...main.querySelectorAll(':scope > section')];
   let layoutFrame = 0;
   let scrollFrame = 0;
+  let scrollIdleTimer = 0;
+  let mobileScrolling = false;
   let segments = [];
   let lane = 0;
   let inside = 0;
@@ -394,14 +396,33 @@
   }
   function updatePlayback() {
     [canvas, closingCanvas].forEach(node => {
-      node.classList.toggle('is-paused', reducedMotion.matches || document.hidden);
+      node.classList.toggle('is-paused', reducedMotion.matches || document.hidden || mobileScrolling);
     });
   }
 
   reducedMotion.addEventListener('change', updatePlayback);
   document.addEventListener('visibilitychange', updatePlayback);
-  window.addEventListener('resize', scheduleDraw, { passive: true });
+  window.addEventListener('resize', () => {
+    // Browser chrome changes height while scrolling; the mobile route only
+    // needs rebuilding for width or content changes (observed below).
+    if (pageWidth <= 700 && pageWidth === document.documentElement.clientWidth) return;
+    scheduleDraw();
+  }, { passive: true });
   window.addEventListener('scroll', () => {
+    if (pageWidth <= 700) {
+      // Stop SVG dash repaints during touch/momentum scrolling and resume
+      // from the same position once the page settles.
+      if (!mobileScrolling) {
+        mobileScrolling = true;
+        updatePlayback();
+      }
+      clearTimeout(scrollIdleTimer);
+      scrollIdleTimer = setTimeout(() => {
+        mobileScrolling = false;
+        updatePlayback();
+      }, 180);
+      return;
+    }
     if (!scrollFrame) scrollFrame = requestAnimationFrame(render);
   }, { passive: true });
   if ('ResizeObserver' in window) {
