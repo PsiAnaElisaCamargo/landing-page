@@ -186,7 +186,7 @@
       node.setAttribute('width', pageWidth);
       node.setAttribute('height', window.innerHeight);
     });
-    const drop = Math.max(220, Math.min(460, window.innerHeight * .55));
+    const drop = Math.max(280, Math.min(560, window.innerHeight * .65));
     const joinY = Math.min(headerBottom + drop, closingTop);
     const index = segments.findIndex(part => joinY <= part.y3);
     const segmentIndex = index < 0 ? segments.length - 1 : index;
@@ -205,11 +205,11 @@
       + 3 * t * t * (part.x3 - part.x2)) / (part.y3 - part.y0);
     const available = Math.max(0, joinY - startY);
     const room = slope > 0 ? endX - 3 : inside - endX;
-    const handle = Math.max(0, Math.min(available * .36, Math.max(0, room) / Math.max(.001, Math.abs(slope))));
+    const handle = Math.max(0, Math.min(available * .42, Math.max(0, room) / Math.max(.001, Math.abs(slope))));
     // One broad cubic from the symbol to the page, split exactly at the header.
     // No forced vertical leg or independent handles at the navbar boundary.
     const p0 = [startX, startY];
-    const p1 = [Math.max(3, startX - Math.min(160, startX * .72)), startY + 12];
+    const p1 = [Math.max(3, startX - Math.min(160, startX * .72)), startY + Math.min(36, available * .08)];
     const p2 = [endX - slope * handle, joinY - handle];
     const p3 = [endX, joinY];
     const mix = (a, b, t) => a.map((value, i) => value + (b[i] - value) * t);
@@ -263,22 +263,33 @@
     lane = outside + (inside - outside) * .48;
     const span = inside - outside;
     segments = [];
-    // Sample a flowing wave with shared derivatives instead of stopping at
-    // every extremum and restarting a new S-curve at each section boundary.
+    // A sine wave distributes the bend evenly, without the flat stretches
+    // and concentrated turns produced by cubing the sine.
     const length = closingTop - startY;
-    // Shorter mobile waves reveal the curve within one screen of scrolling.
-    const waveLength = pageWidth <= 700 ? 640 : 1400;
+    const waveLength = 1700;
     const waveCount = Math.max(1, Math.round(length / waveLength));
-    const steps = waveCount * 16;
+    const steps = waveCount * 24;
     const omega = Math.PI * 2 * waveCount;
+    const edgeWidth = Math.min(.12, .35 / waveCount);
+    const taper = t => {
+      const distance = Math.min(t, 1 - t);
+      if (distance >= edgeWidth) return { value: 1, slope: 0 };
+      const u = Math.max(0, distance / edgeWidth);
+      return {
+        value: u * u * (3 - 2 * u),
+        slope: 6 * u * (1 - u) / edgeWidth * (t < .5 ? 1 : -1)
+      };
+    };
     const wave = t => {
       const phase = omega * t;
-      const amplitude = span * (.37 + .045 * Math.sin(Math.PI * 2 * t));
-      const amplitudeSlope = span * .045 * Math.PI * 2 * Math.cos(Math.PI * 2 * t);
+      // Ease into vertical tangents at the origin and the closing artwork.
+      const edge = taper(t);
+      const amplitude = span * .39 * edge.value;
+      const amplitudeSlope = span * .39 * edge.slope;
       const sine = Math.sin(phase);
       return {
-        x: lane - amplitude * sine ** 3,
-        slope: (-amplitudeSlope * sine ** 3 - 3 * amplitude * sine ** 2 * Math.cos(phase) * omega) / length
+        x: lane - amplitude * sine,
+        slope: (-amplitudeSlope * sine - amplitude * Math.cos(phase) * omega) / length
       };
     };
     for (let index = 0; index < steps; index++) {
@@ -300,7 +311,12 @@
     // Drop along the margin before sweeping gently into the closing drawing.
     let ending = route ? route.d + mobileEnding(endingLane, x, y, center) : `M${point(lane, closingTop)}`;
     if (!route) {
-      ending += curve(endingLane, y(.50), endingLane + (x(.22) - endingLane) * .25, y(.64), x(.22), y(.64));
+      const arrivalX = x(.22);
+      const arrivalY = y(.64);
+      // Spread the final turn over the whole approach, rather than dropping
+      // vertically and concentrating the bend just before the artwork.
+      ending += curve(endingLane, closingTop + (arrivalY - closingTop) * .55,
+        arrivalX - (arrivalX - endingLane) * .55, arrivalY, arrivalX, arrivalY);
       // Loose knots gradually open into a quiet final stem above the copy.
       ending += curve(x(.39), y(.64), x(.29), y(.01), x(.22), y(.25));
       ending += curve(x(.13), y(.61), x(.43), y(.86), x(.48), y(.55));
@@ -335,15 +351,9 @@
       const outerX = rightLane + (lane - outside) * outward;
       answer += curve(rightLane, lastY + height * .24, innerX, lastY + height * (turn - .28), innerX, lastY + height * turn);
       answer += curve(innerX, lastY + height * (turn + depth), outerX, lastY + height * (turn + depth * .38), outerX, lastY + height * (turn - .03));
+      // Flow through the section boundary without a small loop or a short
+      // corrective tail; both adjoining curves share a vertical tangent.
       answer += curve(outerX, lastY + height * (turn - rise), rightLane, lastY + height * .76, rightLane, bottom);
-      // A small spiral grows out of the margin line, rather than floating over text.
-      if (pageWidth > 900 && (index === 1 || index === 3)) {
-        const r = Math.min(30, span * .3);
-        answer += curve(rightLane, bottom + r, rightLane - r * 1.6, bottom + r, rightLane - r * 1.6, bottom);
-        answer += curve(rightLane - r * 1.6, bottom - r * 1.5, rightLane + r, bottom - r * 1.5, rightLane + r, bottom);
-        answer += curve(rightLane + r, bottom + r * 1.3, rightLane - r, bottom + r * 1.1, rightLane - r, bottom);
-        answer += curve(rightLane - r, bottom - r * .6, rightLane, bottom - r * .6, rightLane, bottom);
-      }
       lastY = bottom;
     });
     // One unbroken arc arrives at the upper knot, with no horizontal join
